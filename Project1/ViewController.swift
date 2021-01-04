@@ -10,6 +10,7 @@ import UIKit
 class ViewController: UITableViewController {
     var pictures = [String]()
     var pictures2 = [String]()
+    var pictDict = [String: Int]()
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -20,9 +21,25 @@ class ViewController: UITableViewController {
         
         navigationItem.rightBarButtonItem = UIBarButtonItem(barButtonSystemItem: .action, target: self, action: #selector(suggest))
         
-        tableView.performSelector(onMainThread: #selector(UITableView.reloadData), with: nil, waitUntilDone: false)
+        let defaults = UserDefaults.standard
+        
+        if let savedData = defaults.object(forKey: "pictDict") as? Data,
+        let savedPictures = defaults.object(forKey: "pictures2") as? Data {
+            let jsonDecoder = JSONDecoder()
+            
+            do {
+                pictDict = try jsonDecoder.decode([String: Int].self, from: savedData)
+                pictures2 = try jsonDecoder.decode([String].self, from: savedPictures)
+            }
+            
+            catch {
+                print("Failed to load saved data")
+            }
+        }
         
         performSelector(inBackground: #selector(loadImages), with: nil)
+        
+        tableView.performSelector(onMainThread: #selector(UITableView.reloadData), with: nil, waitUntilDone: false)
     }
     
     @objc func loadImages() {
@@ -33,6 +50,7 @@ class ViewController: UITableViewController {
             if item.hasPrefix("nssl") {
                 // this is a picture to load!
                 pictures.append(item)
+                pictDict[item] = 0
             }
         }
         
@@ -50,7 +68,8 @@ class ViewController: UITableViewController {
     
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "Picture", for: indexPath)
-        cell.textLabel?.text = pictures2[indexPath.row]
+        let picture = pictures2[indexPath.row]
+        cell.textLabel?.text = picture
         return cell
     }
     
@@ -60,6 +79,24 @@ class ViewController: UITableViewController {
             vc.selectedPictureNumber = indexPath.row + 1
             vc.totalPictures = pictures2.count
             navigationController?.pushViewController(vc, animated: true)
+        }
+        
+        let picture = pictures2[indexPath.row]
+        pictDict[picture]! += 1
+        saveImageCount()
+        print("Viewed \(picture) \(pictDict[picture]!) times.")
+        tableView.reloadData()
+    }
+    
+    func saveImageCount() {
+        let jsonEncoder = JSONEncoder()
+        if let savedData = try? jsonEncoder.encode(pictDict),
+        let savedPictures = try? jsonEncoder.encode(pictures2) {
+            let defaults = UserDefaults.standard
+            defaults.set(savedData, forKey: "pictDict")
+            defaults.set(savedPictures, forKey: "pictures2")
+        } else {
+            print("Failed to save data.")
         }
     }
     
